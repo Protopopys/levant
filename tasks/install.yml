@@ -1,0 +1,117 @@
+---
+# Проверяем наличие бинарного файла на удаленной машине
+- name: LEVANT | Check that the levant binary exists on the destination host
+  stat:
+    path: "{{ levant_bin_dir }}/levant"
+    checksum_algorithm: "{{ levant[levant_version].checksum_algorithm }}"
+  register: levant_bin
+
+- name: LEVANT | When need installation or update
+  block:
+    # Создаем папки на удаленной машине
+    - name: LEVANT | Creating folders
+      file:
+        path: "{{ distribution_path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    # Создаем папки на удаленной машине
+    - name: LEVANT | Creating folders
+      file:
+        path: "{{ levant_bin_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+  when: levant_bin.stat.checksum|default() != levant[levant_version].binary_checksum
+
+# Блок заданий
+# исполняется если:
+## Использвание downloader сервера включено - use_downloader=true и (Если файлы нет на удаленном сервере или Контрольная сумма файла не совпадает с указанной в переменной - levant[levant_version].binary_checksum
+- name: LEVANT |(when use_downloader == TRUE)
+  block:
+    # Создаем папку на downloader сервере (в данную папку будет осуществляться скачивание файлы из сети интернет)
+    - name: LEVANT | Creating default folder for components
+      file:
+        path: "{{ downloader_source_folder }}"
+        state: directory
+        mode: "0755"
+      run_once: true
+      delegate_to: localhost
+
+    # Проверяем наличие файла на downloader сервере
+    - name: LEVANT | Check that the levant archive exists on the localhost
+      stat:
+        path: "{{ downloader_source_folder }}/{{ levant[levant_version].source_url | basename }}"
+        checksum_algorithm: "{{ levant[levant_version].checksum_algorithm }}"
+      register: downloader_distr
+      run_once: true
+      delegate_to: localhost
+
+    # Выкачиваем файл напрямую из сети интернет
+    # Если:
+    ## Контрольная сумма файла на downloader не совпадает с указанной в переменной - levant[levant_version].binary_checksum)
+    - name: LEVANT | Download levant file to localhost
+      get_url:
+        url: "{{ levant[levant_version].source_url }}"
+        dest: "{{ downloader_source_folder }}"
+        checksum: "{{ levant[levant_version].checksum_algorithm }}:{{ levant[levant_version].binary_checksum }}"
+        mode: "0755"
+      run_once: true
+      delegate_to: localhost
+      when: downloader_distr.stat.checksum|default() != levant[levant_version].binary_checksum
+
+    # Выполняем синхронизацию архива с удаленной машиной
+    # Если:
+    ## downloader сервером является localhost (машина на которой осуществляется запуск playbook)
+    ## Контрольная сумма архива на удаленном сервере не совпадает с указанной в переменной - levant[levant_version].binary_checksum)
+    - name: LEVANT | Copy from localhost to remote host
+      copy:
+        src: "{{ downloader_source_folder }}/{{ levant[levant_version].source_url | basename }}"
+        dest: "{{ distribution_path }}"
+        owner: root
+        group: root
+        mode: "0755"
+  when:
+    - levant_bin.stat.checksum|default() != levant[levant_version].binary_checksum
+    - use_downloader
+
+# Выкачиваем архив напрямую из сети интернет
+# Если:
+## Использвание downloader сервера отключено: use_downloader=false и (Если архива нет на удаленном сервере или Контрольная сумма архива не совпадает с указанной в переменной - levant[levant_version].binary_checksum)
+- name: LEVANT | Download levant archive to host
+  get_url:
+    url: "{{ levant[levant_version].source_url }}"
+    dest: "{{ distribution_path }}"
+    checksum: "{{ levant[levant_version].checksum_algorithm }}:{{ levant[levant_version].binary_checksum }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - levant_bin.stat.checksum|default() != levant[levant_version].binary_checksum
+    - not use_downloader
+
+
+# Распаковываем архив на удаленном сервере в директорию "{{ levant_bin_dir }}"
+# Если:
+## Контрольная сумма бинарного файла на удаленном хосте не совпадает с указанной в переменной - levant[levant_version].binary_checksum)
+
+- name: LEVANT | Copy from distribution path to bin path
+  copy:
+    src: "{{ distribution_path }}/{{ levant[levant_version].source_url | basename }}"
+    dest: "{{ levant_bin_dir }}/levant"
+    owner: root
+    group: root
+    mode: "1755"
+    remote_src: true
+  when: levant_bin.stat.checksum|default() != levant[levant_version].binary_checksum
+
+# Создаем symlink для бинарного файла
+- name: LEVANT | Create symlink for levant executable
+  file:
+    src: "{{ levant_bin_dir }}/levant"
+    dest: /usr/bin/levant
+    state: link
+  when: "levant_bin_dir != '/usr/bin'"

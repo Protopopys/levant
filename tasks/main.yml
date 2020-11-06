@@ -1,0 +1,4 @@
+- name: LEVANT | Import Levant installation task
+  import_tasks: "install.yml"
+  tags:
+    - install

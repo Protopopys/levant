@@ -1,0 +1,23 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+
+verifier:
+  name: testinfra
+
+platforms:
+  - name: instance1
+    image: protopopys/systemd-centos:7
+    override_command: false
+    tty: true
+
+provisioner:
+  name: ansible
+  playbooks:
+    converge: ${MOLECULE_PLAYBOOK:-converge.yml}

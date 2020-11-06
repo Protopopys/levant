@@ -1,0 +1,24 @@
+# Вкл/Выкл использование downloader сервера (актуально если на удаленном хосте нет доступа к сети интернет или же количество хостов на которые необходимо доставить архив больше 1го)
+use_downloader: true
+# При использовании downloader в данную папку будет осуществлятся скачивание архива, в дальнейшем распространение архива на удаленные хосты осуществляется из данной папки downloader сервера.
+downloader_source_folder: ~/DISTR
+# Папка в которую будет осуществлена загрузка установочного архива
+distribution_path: "/opt/DISTR"
+
+
+# Specifies a local directory used to store agent binary file.
+# This must be specified as an absolute path.
+levant_bin_dir: "/opt/levant/{{ levant_version }}"
+
+### Levant versions ###
+# Устанавливаемая версия Levant
+levant_version: v0.2.9
+# Distributives
+levant:
+  # Список версий с параметрами (контрольная сумма бинарного файла, пряма ссылка в сети интернет)
+  v0.2.9:
+    # Прямая ссылка в сети интернет для возможноти скачать архив с levant
+    source_url: https://github.com/hashicorp/levant/releases/download/0.2.9/linux-amd64-levant
+    # Контрольная сумма скачаемого архива
+    checksum_algorithm: "sha256"
+    binary_checksum: f454e5ca9f79dd092535282dfd66fa4807cb747b502579604e4a21b8f649489a
